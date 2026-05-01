@@ -1,4 +1,3 @@
-import OpenAI from 'openai';
 import log from '../utils/logger.js';
 
 const CODE_REVIEW_PROMPT = `You are an expert code reviewer. Analyze the following code and provide a detailed review.
@@ -24,35 +23,35 @@ async function callAIProvider(code) {
   log.info('AI', 'Starting AI analysis');
   log.debug('AI', `Code length: ${code.length} characters`);
 
-  const openai = new OpenAI({
-    apiKey: process.env.NVIDIA_API_KEY,
-    baseURL: 'https://integrate.api.nvidia.com/v1',
-  });
+  const API_KEY = process.env.GEMMA_API_KEY;
+  const model = 'gemini-flash-latest';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   const startTime = Date.now();
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'qwen/qwen2.5-coder-32b-instruct',
-      messages: [
-        {
-          role: 'user',
-          content: CODE_REVIEW_PROMPT + code
-        }
-      ],
-      temperature: 0.2,
-      top_p: 0.7,
-      max_tokens: 1024,
-      stream: true,
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-goog-api-key': API_KEY,
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [{ text: CODE_REVIEW_PROMPT + code }],
+          },
+        ],
+      }),
     });
 
-    log.debug('AI', 'Stream started, buffering response...');
+    const data = await response.json();
 
-    let fullResponse = '';
-    for await (const chunk of completion) {
-      const content = chunk.choices[0]?.delta?.content || '';
-      fullResponse += content;
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Failed to get response from Gemma API');
     }
+
+    const fullResponse = data.candidates[0].content.parts[0].text;
 
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
