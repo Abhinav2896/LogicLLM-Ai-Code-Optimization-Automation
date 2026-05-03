@@ -1,10 +1,10 @@
 # LogicLLM
 
-AI-powered code review and optimization tool powered by Qwen.
+AI-powered code review and optimization tool powered by Google's Gemini Flash.
 
 ## Architecture Overview
 
-LogicLLM is a full-stack code review application with a React frontend and Node.js backend. Users submit code through the frontend, which sends it to a backend that uses NVIDIA's OpenAI-compatible API with the `qwen/qwen2.5-coder-32b-instruct` model to analyze and return structured results.
+LogicLLM is a full-stack code review application with a React frontend and Node.js backend. Users submit code through the frontend, which sends it to a backend that uses Google's Generative Language API with the `gemini-flash-latest` model to analyze and return structured results.
 
 ```
 ┌─────────────────────┐     ┌─────────────────────┐
@@ -15,8 +15,8 @@ LogicLLM is a full-stack code review application with a React frontend and Node.
                                     │
                                     ▼
                            ┌─────────────────────┐
-                           │  NVIDIA API         │
-                           │  qwen2.5-coder      │
+                           │  Google Gemini API  │
+                           │  gemini-flash-latest│
                            └─────────────────────┘
 ```
 
@@ -26,14 +26,14 @@ LogicLLM is a full-stack code review application with a React frontend and Node.
 |-------|------------|------|
 | Frontend | React + Vite | 3000 |
 | Backend | Node.js + Express | 3001 |
-| AI Provider | NVIDIA OpenAI API | - |
-| Model | qwen/qwen2.5-coder-32b-instruct | - |
+| AI Provider | Google Generative Language API | - |
+| Model | gemini-flash-latest | - |
 
 ## Project Structure
 
 ```
 LogicLLM/
-├── Frontend/                    # React frontend application
+├── frontend/                    # React frontend application
 │   ├── src/
 │   │   └── app/
 │   │       ├── components/      # UI components (annotated)
@@ -61,15 +61,15 @@ LogicLLM/
 │   │   ├── routes/
 │   │   │   └── analyze.js      # POST /api/analyze endpoint
 │   │   ├── services/
-│   │   │   ├── aiProvider.js   # FN-005: NVIDIA API adapter
+│   │   │   ├── aiProvider.js   # FN-005: Gemini API adapter
 │   │   │   ├── fallback.js     # FN-007: Fallback response generator
 │   │   │   └── parser.js       # FN-006: Response parser/normalizer
 │   │   ├── utils/
 │   │   │   └── logger.js       # FN-008: Tagged logging system
 │   │   └── index.js            # Express server entry point
-│   └── package.json
+│   ├── package.json
+│   └── .env                     # Environment variables (API key)
 ├── runner.js                    # Server lifecycle manager (FN-001, FN-002)
-├── .env                         # Environment variables (API key)
 ├── .env.example                 # Environment template
 ├── backend_implementation.md    # Detailed backend documentation
 └── README.md
@@ -83,7 +83,7 @@ LogicLLM/
 | FN-002 | Runner Orchestrator | Starts/stops frontend and backend | runner.js |
 | FN-003 | Health Check | Confirms backend is alive | backend/src/index.js |
 | FN-004 | Input Validator | Validates code before AI processing | backend/src/middleware/validator.js |
-| FN-005 | AI Provider Adapter | Sends code to NVIDIA API, buffers streaming | backend/src/services/aiProvider.js |
+| FN-005 | AI Provider Adapter | Sends code to Gemini API | backend/src/services/aiProvider.js |
 | FN-006 | Response Parser | Parses AI output into stable JSON | backend/src/services/parser.js |
 | FN-007 | Fallback Generator | Returns safe response if AI fails | backend/src/services/fallback.js |
 | FN-008 | Logger | Tagged logging for debugging | backend/src/utils/logger.js |
@@ -130,7 +130,7 @@ Analyzes code using AI and returns structured results.
 ## UI Component Mapping
 
 | Component | Backend Connection | API Endpoint |
-|-----------|-------------------|-------------|
+|-----------|-------------------|--------------|
 | Header | NONE | - |
 | CodeInput | NONE | - |
 | ActionBar | FN-004 (Input Validator) | POST /api/analyze |
@@ -180,9 +180,9 @@ User enters code
 ┌─────────────────────────────────────────┐
 │  FN-005: AI Provider Adapter            │
 │  - Constructs prompt                    │
-│  - Calls NVIDIA API                     │
-│  - Buffers streaming response           │
-│  - qwen/qwen2.5-coder-32b-instruct     │
+│  - Calls Gemini API                      │
+│  - Receives complete response            │
+│  - gemini-flash-latest model            │
 └─────────────────────────────────────────┘
        │
        ▼
@@ -229,7 +229,7 @@ All backend logs use tagged format:
 ```
 [2026-04-24T10:30:00.000Z] [INFO] [SERVER] Backend server starting on port 3001
 [2026-04-24T10:30:01.000Z] [DEBUG] [PORT] Port 3001 is available
-[2026-04-24T10:30:05.000Z] [INFO] [AI] Calling NVIDIA API...
+[2026-04-24T10:30:05.000Z] [INFO] [AI] Calling Gemini API...
 [2026-04-24T10:30:07.000Z] [SUCCESS] [AI] Response received in 1.5s
 [2026-04-24T10:30:07.000Z] [DEBUG] [PARSER] JSON parsed successfully
 ```
@@ -238,17 +238,22 @@ All backend logs use tagged format:
 
 ### Environment Variables
 
-Create a `.env` file in the project root:
+Create a `.env` file in the `backend/` directory:
 
 ```env
-NVIDIA_API_KEY=your_nvidia_api_key_here
+GEMMA_API_KEY=your_google_api_key_here
 ```
 
 **Required:**
 
 | Variable | Description |
 |----------|-------------|
-| NVIDIA_API_KEY | API key for NVIDIA OpenAI endpoint |
+| GEMMA_API_KEY | API key for Google Generative Language API |
+
+**How to get an API key:**
+1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Create a new API key with access to the Generative Language API
+3. Copy the key and add it to your `.env` file
 
 ### Port Configuration
 
@@ -263,8 +268,8 @@ NVIDIA_API_KEY=your_nvidia_api_key_here
 
 ```bash
 node runner.js start    # Start both servers
-node runner.js stop    # Stop both servers
-node runner.js restart # Restart both servers
+node runner.js stop     # Stop both servers
+node runner.js restart  # Restart both servers
 ```
 
 Or simply run:
@@ -279,11 +284,11 @@ The backend always returns valid JSON with this structure:
 ```typescript
 interface AnalysisResponse {
   language: string;       // Auto-detected programming language
-  bugs: string[];         // Array of bug/error descriptions
+  bugs: string[];          // Array of bug/error descriptions
   improvements: string[]; // Array of suggestion strings
-  explanation: string;   // Plain English code explanation
+  explanation: string;    // Plain English code explanation
   optimized_code: string; // Optimized version of code
-  score: number;         // Quality score 0-100
+  score: number;          // Quality score 0-100
   time: string;           // Processing time (e.g., "1.5s")
 }
 ```
@@ -309,3 +314,15 @@ score = max(0, score)
 - Each bug found: -5 points
 - Each improvement suggestion: -2 points
 - Minimum score: 0
+
+## Supported Models
+
+You can configure which Gemini model to use by modifying the `model` variable in `backend/src/services/aiProvider.js`:
+
+| Model | Description |
+|-------|-------------|
+| gemini-flash-latest | Fast, cost-effective for code review |
+| gemini-2.0-flash | Latest Gemini 2.0 Flash model |
+| gemini-1.5-flash | Stable Gemini 1.5 Flash model |
+| gemini-1.5-pro | Higher quality but slower |
+| gemini-2.0-pro | Most capable Gemini 2.0 model |

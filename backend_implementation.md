@@ -4,7 +4,7 @@
 
 **Project Name:** LogicLLM
 
-**Project Goal:** Build a code-review application where a React frontend accepts user code, sends it to a Node.js backend, which uses NVIDIA's OpenAI-compatible API with the `qwen/qwen2.5-coder-32b-instruct` model to analyze the code and return structured results.
+**Project Goal:** Build a code-review application where a React frontend accepts user code, sends it to a Node.js backend, which uses Google's Generative Language API with the `gemini-flash-latest` model to analyze the code and return structured results.
 
 **Frontend:** React + Vite application running on port 3000
 **Backend:** Node.js + Express server running on port 3001
@@ -16,8 +16,8 @@
 ### Technology Stack
 - **Runtime:** Node.js
 - **Framework:** Express.js
-- **AI Provider:** OpenAI SDK with NVIDIA baseURL
-- **Model:** `qwen/qwen2.5-coder-32b-instruct`
+- **AI Provider:** Google Generative Language API (via fetch)
+- **Model:** `gemini-flash-latest`
 - **Logging:** Custom logger with tagged log levels
 
 ### Server Configuration
@@ -46,8 +46,8 @@
 │                                ▼                                 │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │                 FN-005: AI Provider Adapter              │    │
-│  │     Sends code to NVIDIA API with qwen2.5-coder model    │    │
-│  │              Buffers streaming output                    │    │
+│  │     Sends code to Gemini API with gemini-flash model    │    │
+│  │              Receives complete response                 │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │                                │                                 │
 │                                ▼                                 │
@@ -90,7 +90,7 @@
 | FN-002 | Runner Orchestrator | Starts/stops frontend and backend servers |
 | FN-003 | Health Check | Confirms backend is alive at /health |
 | FN-004 | Input Validator | Validates incoming code before processing |
-| FN-005 | AI Provider Adapter | Sends code to NVIDIA API, handles streaming |
+| FN-005 | AI Provider Adapter | Sends code to Gemini API, handles response |
 | FN-006 | Response Parser/Normalizer | Parses AI output into stable JSON |
 | FN-007 | Fallback Generator | Generates safe response if AI fails |
 | FN-008 | Logger | Logs all request/response lifecycle events |
@@ -230,29 +230,30 @@ or
 
 ### FN-005 — AI Provider Adapter
 
-**Purpose:** Sends validated code to NVIDIA API and handles streaming responses.
+**Purpose:** Sends validated code to Gemini API and handles responses.
 
 **Responsibilities:**
 - Construct prompt for code review
-- Call NVIDIA OpenAI endpoint with qwen2.5-coder-32b-instruct model
-- Handle streaming responses
-- Buffer complete output before returning
+- Call Google Generative Language API with gemini-flash-latest model
+- Handle response JSON
 - Manage API credentials securely via environment variables
 
 **AI Request Configuration:**
 ```javascript
 {
-  model: "qwen/qwen2.5-coder-32b-instruct",
-  messages: [
-    {
-      role: "user",
-      content: codeReviewPrompt + userCode
-    }
-  ],
-  temperature: 0.2,
-  top_p: 0.7,
-  max_tokens: 1024,
-  stream: true
+  model: "gemini-flash-latest",
+  url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
+  headers: {
+    "Content-Type": "application/json",
+    "X-goog-api-key": API_KEY
+  },
+  body: {
+    contents: [
+      {
+        parts: [{ text: codeReviewPrompt + userCode }]
+      }
+    ]
+  }
 }
 ```
 
@@ -278,11 +279,11 @@ Code to review:
 [pasted code here]
 ```
 
-**Stream Handling:**
-- Collect all chunks in buffer
-- Concatenate delta content from each chunk
-- Return complete response after stream ends
-- Handle stream errors gracefully
+**Response Handling:**
+- Parse JSON response from Gemini API
+- Extract text from `data.candidates[0].content.parts[0].text`
+- Return complete response
+- Handle API errors gracefully
 
 **Error Cases:**
 - API key missing → Returns error to FN-006
@@ -366,10 +367,9 @@ Code to review:
 ```
 
 **When Triggered:**
-- AI API returns non-200 status
-- AI API times out
+- Gemini API returns non-200 status
+- Gemini API times out
 - JSON parsing fails
-- Stream is interrupted
 - Network errors occur
 
 **UI Component:** All result components receive fallback data
@@ -454,7 +454,7 @@ Example: [2026-04-24T00:00:00.000Z] [INFO] [SERVER] Backend server starting on p
 5. Log validation success (FN-008)
 6. Start timer
 7. Send to AI Provider (FN-005)
-8. Buffer streaming response
+8. Receive Gemini API response
 9. Parse response (FN-006)
 10. Calculate score
 11. Stop timer
@@ -593,14 +593,19 @@ Every API request logs:
 
 | Variable | Description | Required | Location Used |
 |----------|-------------|----------|---------------|
-| NVIDIA_API_KEY | API key for NVIDIA OpenAI endpoint | YES | FN-005 (AI Provider Adapter) |
+| GEMMA_API_KEY | API key for Google Generative Language API | YES | FN-005 (AI Provider Adapter) |
 | FRONTEND_PORT | Frontend server port (fixed: 3000) | NO (default 3000) | FN-002 |
 | BACKEND_PORT | Backend server port (fixed: 3001) | NO (default 3001) | FN-002 |
 
 ### Environment File (.env)
 ```
-NVIDIA_API_KEY=your_api_key_here
+GEMMA_API_KEY=your_google_api_key_here
 ```
+
+### Getting an API Key
+1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Create a new API key with access to the Generative Language API
+3. Copy the key to your `.env` file
 
 ---
 
@@ -609,7 +614,7 @@ NVIDIA_API_KEY=your_api_key_here
 ### Project Structure
 ```
 LogicLLM/
-├── Frontend/                    # React frontend (Vite)
+├── frontend/                    # React frontend (Vite)
 │   ├── src/
 │   │   └── app/
 │   │       ├── components/      # UI Components (annotated)
@@ -625,15 +630,15 @@ LogicLLM/
 │   │   ├── middleware/
 │   │   │   └── validator.js     # FN-004 Input Validator
 │   │   ├── services/
-│   │   │   ├── aiProvider.js    # FN-005 AI Provider Adapter
-│   │   │   ├── parser.js       # FN-006 Response Parser
+│   │   │   ├── aiProvider.js    # FN-005 AI Provider Adapter (Gemini)
+│   │   │   ├── parser.js        # FN-006 Response Parser
 │   │   │   └── fallback.js      # FN-007 Fallback Generator
 │   │   └── utils/
-│   │       └── logger.js       # FN-008 Logger
+│   │       └── logger.js        # FN-008 Logger
 │   └── package.json
 ├── runner.js                    # FN-001 & FN-002 (Port Manager + Orchestrator)
 ├── backend_implementation.md    # This documentation
-└── .env                        # Environment variables (NVIDIA_API_KEY)
+└── README.md
 ```
 
 ### Backend File Details
@@ -644,6 +649,7 @@ LogicLLM/
 - Route mounting
 - Health check endpoint (FN-003)
 - Error handling middleware
+- dotenv configuration for GEMMA_API_KEY
 
 **`backend/src/routes/analyze.js`**
 - POST /api/analyze endpoint
@@ -658,9 +664,9 @@ LogicLLM/
 
 **`backend/src/services/aiProvider.js`**
 - FN-005 AI Provider Adapter
-- OpenAI SDK integration
-- Streaming buffer handling
-- NVIDIA API configuration
+- Google Generative Language API integration
+- Direct fetch calls with X-goog-api-key header
+- Response parsing from Gemini API format
 
 **`backend/src/services/parser.js`**
 - FN-006 Response Parser
@@ -751,4 +757,27 @@ Content-Type: application/json
   "time": "0ms",
   "fallback": true
 }
+```
+
+---
+
+## 14. Supported Gemini Models
+
+The AI Provider Adapter supports any Gemini model available in the Google Generative Language API. To change models, modify the `model` variable in `backend/src/services/aiProvider.js`.
+
+| Model | Description |
+|-------|-------------|
+| gemini-flash-latest | Fast, cost-effective for code review (default) |
+| gemini-2.0-flash | Latest Gemini 2.0 Flash model |
+| gemini-1.5-flash | Stable Gemini 1.5 Flash model |
+| gemini-1.5-pro | Higher quality but slower |
+| gemini-2.0-pro | Most capable Gemini 2.0 model |
+
+### Changing the Model
+
+In `backend/src/services/aiProvider.js`:
+
+```javascript
+const model = 'gemini-1.5-pro';  // Change this to any available model
+const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 ```
