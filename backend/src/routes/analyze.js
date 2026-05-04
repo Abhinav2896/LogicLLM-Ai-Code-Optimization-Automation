@@ -2,7 +2,7 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import log from '../utils/logger.js';
 import validateInput from '../middleware/validator.js';
-import callAIProvider from '../services/aiProvider.js';
+import analyzeCode from '../services/ragClient.js';
 import parseAIResponse from '../services/parser.js';
 import generateFallback from '../services/fallback.js';
 
@@ -29,7 +29,7 @@ router.post('/analyze', async (req, res) => {
   log.debug('VALIDATOR', `Validation passed for request ${requestId}`);
   log.info('AI', `Starting AI analysis for request ${requestId}`);
 
-  const aiResult = await callAIProvider(validation.code);
+  const aiResult = await analyzeCode(validation.code);
 
   if (!aiResult.success) {
     log.error('AI', `AI call failed for request ${requestId}: ${aiResult.error}`);

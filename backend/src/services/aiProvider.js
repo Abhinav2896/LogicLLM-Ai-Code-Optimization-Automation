@@ -1,3 +1,13 @@
+/**
+ * @deprecated FN-005: AI Provider Adapter — RETIRED
+ *
+ * This file previously handled direct Gemini API calls.
+ * As of the RAG integration, it has been replaced by ragClient.js (FN-005-RAG).
+ * Kept as fallback reference. Do not import this file in production routes.
+ *
+ * To revert to direct Gemini calls: in analyze.js, swap ragClient → aiProvider.
+ */
+
 import log from '../utils/logger.js';
 
 const CODE_REVIEW_PROMPT = `You are an expert code reviewer. Analyze the following code and provide a detailed review.

@@ -1,4 +1,4 @@
-import { spawn, exec, execSync } from 'child_process';
+import { spawn, exec } from 'child_process';
 import { setTimeout } from 'timers/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -6,11 +6,14 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const RAG_PORT = 8000;
 const FRONTEND_PORT = 3000;
 const BACKEND_PORT = 3001;
+const RAG_DIR = join(__dirname, 'rag_service');
 const FRONTEND_DIR = join(__dirname, 'Frontend');
 const BACKEND_DIR = join(__dirname, 'backend');
 
+let ragProcess = null;
 let frontendProcess = null;
 let backendProcess = null;
 
@@ -79,12 +82,21 @@ async function checkPortFree(port) {
 async function ensurePortsFree() {
   log.info('PORT', 'Checking port availability...');
 
+  const ragFree = await checkPortFree(RAG_PORT);
   const frontendFree = await checkPortFree(FRONTEND_PORT);
   const backendFree = await checkPortFree(BACKEND_PORT);
 
-  if (frontendFree && backendFree) {
-    log.success('PORT', `Both ports ${FRONTEND_PORT} and ${BACKEND_PORT} are free`);
+  if (ragFree && frontendFree && backendFree) {
+    log.success('PORT', `All ports ${RAG_PORT}, ${FRONTEND_PORT}, and ${BACKEND_PORT} are free`);
     return true;
+  }
+
+  if (!ragFree) {
+    const killed = await killProcessOnPortWindows(RAG_PORT);
+    if (!killed) {
+      log.error('PORT', `Could not free port ${RAG_PORT}. Launch aborted.`);
+      return false;
+    }
   }
 
   if (!frontendFree) {
@@ -103,8 +115,14 @@ async function ensurePortsFree() {
     }
   }
 
+  const ragStillFree = await checkPortFree(RAG_PORT);
   const frontendStillFree = await checkPortFree(FRONTEND_PORT);
   const backendStillFree = await checkPortFree(BACKEND_PORT);
+
+  if (!ragStillFree) {
+    log.error('PORT', `Port ${RAG_PORT} still occupied after kill attempt. Launch aborted.`);
+    return false;
+  }
 
   if (!frontendStillFree) {
     log.error('PORT', `Port ${FRONTEND_PORT} still occupied after kill attempt. Launch aborted.`);
@@ -118,6 +136,55 @@ async function ensurePortsFree() {
 
   log.success('PORT', 'All ports are now free');
   return true;
+}
+
+async function waitForRAGHealth(maxWaitMs = 90000) {
+  const startTime = Date.now();
+  const checkInterval = 1000;
+
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      const response = await fetch(`http://localhost:${RAG_PORT}/health`);
+      if (response.ok) {
+        return true;
+      }
+    } catch {
+    }
+    await setTimeout(checkInterval);
+  }
+  return false;
+}
+
+function startRAG() {
+  log.info('RAG', `Starting Python RAG service on port ${RAG_PORT}...`);
+
+  const pythonPath = join(RAG_DIR, '.venv_local', 'Scripts', 'python.exe');
+
+  ragProcess = spawn(pythonPath, ['-m', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', RAG_PORT.toString()], {
+    cwd: RAG_DIR,
+    stdio: 'pipe',
+    shell: true
+  });
+
+  ragProcess.stdout.on('data', (data) => {
+    process.stdout.write(`[RAG] ${data}`);
+  });
+
+  ragProcess.stderr.on('data', (data) => {
+    process.stderr.write(`[RAG ERROR] ${data}`);
+  });
+
+  ragProcess.on('close', (code) => {
+    if (code !== 0 && code !== null) {
+      log.error('RAG', `RAG process exited with code ${code}`);
+    }
+  });
+
+  ragProcess.on('error', (err) => {
+    log.error('RAG', `RAG failed to start: ${err.message}`);
+  });
+
+  log.debug('RAG', `RAG process started with PID ${ragProcess.pid}`);
 }
 
 function startBackend() {
@@ -207,6 +274,16 @@ async function shutdown() {
     });
   }
 
+  if (ragProcess) {
+    log.debug('SHUTDOWN', 'Stopping RAG service...');
+    ragProcess.kill('SIGTERM');
+    setTimeout(1000).then(() => {
+      if (ragProcess) {
+        ragProcess.kill('SIGKILL');
+      }
+    });
+  }
+
   log.success('SHUTDOWN', 'Shutdown completed');
   process.exit(0);
 }
@@ -219,31 +296,43 @@ async function main() {
   console.log('   LogicLLM - Runner');
   console.log('========================================\n');
 
-  log.info('RUNNER', 'Starting application launcher...');
-  log.info('RUNNER', `Frontend port: ${FRONTEND_PORT}`);
+  log.info('RUNNER', 'Starting LogicLLM with RAG...');
+  log.info('RUNNER', `RAG service port: ${RAG_PORT}`);
   log.info('RUNNER', `Backend port: ${BACKEND_PORT}`);
+  log.info('RUNNER', `Frontend port: ${FRONTEND_PORT}`);
 
   const portsReady = await ensurePortsFree();
 
   if (!portsReady) {
-    log.error('RUNNER', 'Ports are not available. Cannot start servers.');
+    log.error('RUNNER', 'Ports are not available. Cannot start services.');
     console.log('\n========================================');
     console.log('   ERROR: Ports unavailable');
-    console.log(`   Please free ports ${FRONTEND_PORT} and ${BACKEND_PORT}`);
+    console.log(`   Please free ports ${RAG_PORT}, ${FRONTEND_PORT}, and ${BACKEND_PORT}`);
     console.log('========================================\n');
     process.exit(1);
   }
 
+  startRAG();
+  log.info('RAG', 'Waiting for RAG service to be ready...');
+
+  const ragReady = await waitForRAGHealth(90000);
+  if (!ragReady) {
+    log.error('RUNNER', 'RAG service failed to become ready within 90s. Aborting.');
+    process.exit(1);
+  }
+  log.success('RAG', `RAG service ready on port ${RAG_PORT}`);
+
   startBackend();
   startFrontend();
 
-  log.success('RUNNER', 'Servers starting...');
+  log.success('RUNNER', 'All services running...');
   log.info('RUNNER', 'Press Ctrl+C to stop all servers');
 
   console.log('\n========================================');
-  console.log('   Servers starting...');
-  console.log(`   Frontend: http://localhost:${FRONTEND_PORT}`);
+  console.log('   All services running...');
+  console.log(`   RAG Service: http://localhost:${RAG_PORT}`);
   console.log(`   Backend: http://localhost:${BACKEND_PORT}`);
+  console.log(`   Frontend: http://localhost:${FRONTEND_PORT}`);
   console.log('========================================\n');
 }
 
