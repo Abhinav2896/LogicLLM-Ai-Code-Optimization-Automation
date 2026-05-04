@@ -11,8 +11,12 @@ __pycache__/
 *.db
 .DS_Store
 venv/
+.venv/
+.venv_local/
 *.h5
 *.pt
 *.ckpt
 models/
 data/
+rag_service/faiss_index/
+rag_service/package-lock.json
