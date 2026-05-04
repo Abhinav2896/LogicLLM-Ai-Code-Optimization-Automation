@@ -1,23 +1,29 @@
 # LogicLLM
 
-AI-powered code review and optimization tool powered by Google's Gemini Flash.
+AI-powered code review and optimization tool powered by Google's Gemini Flash with RAG (Retrieval-Augmented Generation).
 
 ## Architecture Overview
 
-LogicLLM is a full-stack code review application with a React frontend and Node.js backend. Users submit code through the frontend, which sends it to a backend that uses Google's Generative Language API with the `gemini-flash-latest` model to analyze and return structured results.
+LogicLLM is a full-stack code review application with a React frontend, Node.js backend, and Python RAG microservice. Users submit code through the frontend, which sends it to the backend that calls a Python RAG service. The RAG service retrieves relevant best practices from a knowledge base and uses Gemini to analyze the code.
 
 ```
-┌─────────────────────┐     ┌─────────────────────┐
-│   Frontend (3000)   │────▶│   Backend (3001)    │
-│   React + Vite      │     │   Node.js + Express│
-│                     │◀────│                     │
-└─────────────────────┘     └─────────────────────┘
-                                    │
-                                    ▼
-                           ┌─────────────────────┐
-                           │  Google Gemini API  │
-                           │  gemini-flash-latest│
-                           └─────────────────────┘
+┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│   Frontend (3000)   │────▶│   Backend (3001)    │────▶│   RAG Service (8000)│
+│   React + Vite      │     │   Node.js + Express│     │   FastAPI + LangChain│
+│                     │◀────│                     │◀────│                     │
+└─────────────────────┘     └─────────────────────┘     └─────────────────────┘
+                                                                    │
+                                                                    ▼
+                                                           ┌─────────────────────┐
+                                                           │   FAISS Vector Store │
+                                                           │   (Knowledge Base)   │
+                                                           └─────────────────────┘
+                                                                    │
+                                                                    ▼
+                                                           ┌─────────────────────┐
+                                                           │   Google Gemini API  │
+                                                           │   gemini-flash-latest│
+                                                           └─────────────────────┘
 ```
 
 ## Technology Stack
@@ -26,303 +32,219 @@ LogicLLM is a full-stack code review application with a React frontend and Node.
 |-------|------------|------|
 | Frontend | React + Vite | 3000 |
 | Backend | Node.js + Express | 3001 |
+| RAG Service | Python + FastAPI + LangChain | 8000 |
+| Vector Store | FAISS + HuggingFace Embeddings | - |
 | AI Provider | Google Generative Language API | - |
-| Model | gemini-flash-latest | - |
+| Model | gemini-flash-latest (configurable) | - |
 
 ## Project Structure
 
 ```
 LogicLLM/
-├── frontend/                    # React frontend application
+├── frontend/                          # React frontend application (NO CHANGE)
 │   ├── src/
 │   │   └── app/
-│   │       ├── components/      # UI components (annotated)
-│   │       │   ├── ActionBar.tsx
-│   │       │   ├── BugsSection.tsx
-│   │       │   ├── CodeInput.tsx
-│   │       │   ├── EmptyState.tsx
-│   │       │   ├── ExplanationSection.tsx
-│   │       │   ├── Header.tsx
-│   │       │   ├── ImprovementsSection.tsx
-│   │       │   ├── MetadataBar.tsx
-│   │       │   ├── OptimizedCode.tsx
-│   │       │   ├── OutputPanel.tsx
-│   │       │   ├── ResultSection.tsx
-│   │       │   ├── SkeletonLoader.tsx
-│   │       │   └── ThinkingPanel.tsx
-│   │       ├── App.tsx          # Main application component
-│   │       └── main.tsx         # Application entry point
-│   ├── package.json
-│   └── vite.config.ts           # Vite config with proxy
-├── backend/                     # Node.js backend application
+│   │       ├── components/            # UI components
+│   │       ├── App.tsx                # Main application component
+│   │       └── main.tsx               # Application entry point
+│   └── ...
+├── backend/                           # Node.js backend application
 │   ├── src/
-│   │   ├── middleware/
-│   │   │   └── validator.js    # FN-004: Input validation
+│   │   ├── index.js                   # Express server entry point
 │   │   ├── routes/
-│   │   │   └── analyze.js      # POST /api/analyze endpoint
+│   │   │   └── analyze.js             # POST /api/analyze endpoint
+│   │   ├── middleware/
+│   │   │   └── validator.js           # FN-004: Input validation
 │   │   ├── services/
-│   │   │   ├── aiProvider.js   # FN-005: Gemini API adapter
-│   │   │   ├── fallback.js     # FN-007: Fallback response generator
-│   │   │   └── parser.js       # FN-006: Response parser/normalizer
-│   │   ├── utils/
-│   │   │   └── logger.js       # FN-008: Tagged logging system
-│   │   └── index.js            # Express server entry point
-│   ├── package.json
-│   └── .env                     # Environment variables (API key)
-├── runner.js                    # Server lifecycle manager (FN-001, FN-002)
-├── .env.example                 # Environment template
-├── backend_implementation.md    # Detailed backend documentation
-└── README.md
+│   │   │   ├── aiProvider.js          # FN-005: DEPRECATED (kept as backup)
+│   │   │   ├── ragClient.js           # FN-005-RAG: RAG service client
+│   │   │   ├── parser.js              # FN-006: Response parser
+│   │   │   └── fallback.js            # FN-007: Fallback generator
+│   │   └── utils/
+│   │       └── logger.js              # FN-008: Tagged logging system
+│   └── package.json
+├── rag_service/                       # Python RAG microservice
+│   ├── main.py                        # FastAPI entry point
+│   ├── rag_pipeline.py                # Core RAG orchestration
+│   ├── vector_store.py                # FAISS index management
+│   ├── ingest.py                      # Knowledge base ingestion script
+│   ├── prompts.py                     # Prompt templates
+│   ├── schemas.py                     # Pydantic models
+│   ├── config.py                      # Configuration loader
+│   ├── data/
+│   │   ├── knowledge_base/             # Markdown knowledge documents
+│   │   │   ├── python_best_practices.md
+│   │   │   ├── javascript_best_practices.md
+│   │   │   ├── typescript_best_practices.md
+│   │   │   ├── java_best_practices.md
+│   │   │   ├── common_security_bugs.md
+│   │   │   ├── performance_patterns.md
+│   │   │   └── clean_code_principles.md
+│   │   └── faiss_index/               # Generated FAISS index (gitignored)
+│   ├── requirements.txt
+│   └── .env
+├── runner.js                          # Server lifecycle manager
+├── README.md
+└── backend_implementation.md
 ```
 
 ## Backend Function Registry
 
-| ID | Function | Purpose | Location |
-|----|----------|---------|----------|
-| FN-001 | Port Manager | Checks and frees ports 3000/3001 | runner.js |
-| FN-002 | Runner Orchestrator | Starts/stops frontend and backend | runner.js |
-| FN-003 | Health Check | Confirms backend is alive | backend/src/index.js |
-| FN-004 | Input Validator | Validates code before AI processing | backend/src/middleware/validator.js |
-| FN-005 | AI Provider Adapter | Sends code to Gemini API | backend/src/services/aiProvider.js |
-| FN-006 | Response Parser | Parses AI output into stable JSON | backend/src/services/parser.js |
-| FN-007 | Fallback Generator | Returns safe response if AI fails | backend/src/services/fallback.js |
-| FN-008 | Logger | Tagged logging for debugging | backend/src/utils/logger.js |
+| ID | Function | Purpose | Location | Status |
+|----|----------|---------|----------|--------|
+| FN-001 | Port Manager | Checks/frees ports 3000, 3001, 8000 | runner.js | UPDATED |
+| FN-002 | Runner Orchestrator | Starts/stops all services | runner.js | UPDATED |
+| FN-003 | Health Check (Node) | Confirms backend alive | backend/src/index.js | NO CHANGE |
+| FN-003b | Health Check (RAG) | Confirms RAG service alive | rag_service/main.py | NEW |
+| FN-004 | Input Validator | Validates code before AI | backend/src/middleware/validator.js | NO CHANGE |
+| FN-005 | AI Provider Adapter | Direct Gemini caller | backend/src/services/aiProvider.js | **DEPRECATED** |
+| FN-005-RAG | RAG Client | HTTP client to Python RAG | backend/src/services/ragClient.js | **NEW** |
+| FN-006 | Response Parser | Parses AI output | backend/src/services/parser.js | NO CHANGE |
+| FN-007 | Fallback Generator | Safe fallback on errors | backend/src/services/fallback.js | NO CHANGE |
+| FN-008 | Logger | Tagged logging | backend/src/utils/logger.js | NO CHANGE |
+| FN-009 | RAG Pipeline | FAISS + Gemini orchestration | rag_service/rag_pipeline.py | **NEW** |
+| FN-010 | Vector Store | FAISS index operations | rag_service/vector_store.py | **NEW** |
+
+## Setup Instructions
+
+### Prerequisites
+- Node.js >= 18
+- Python >= 3.10
+- pip
+
+### First-time Setup
+
+**Step 1: Install Node.js dependencies**
+```bash
+cd backend
+npm install
+```
+
+**Step 2: Set up Python environment**
+```bash
+cd rag_service
+python -m venv .venv_local
+# Windows: .venv_local\Scripts\activate
+# Unix: source .venv_local/bin/activate
+pip install -r requirements.txt
+```
+
+**Step 3: Configure API key**
+```bash
+# In rag_service/.env
+GEMMA_API_KEY=your_google_api_key_here
+GEMINI_MODEL=gemini-flash-latest
+```
+
+**Step 4: Build FAISS index (one-time)**
+```bash
+cd rag_service
+python ingest.py
+```
+
+**Step 5: Start everything**
+```bash
+node runner.js
+```
 
 ## API Endpoints
 
-### GET /health
-
-Health check endpoint to verify backend is running.
-
-**Response:**
+### GET /health (Backend)
 ```json
-{
-  "status": "ok",
-  "timestamp": "2026-04-24T00:00:00.000Z",
-  "service": "ai-code-reviewer-backend"
-}
+{ "status": "ok", "timestamp": "...", "service": "ai-code-reviewer-backend" }
+```
+
+### GET /health (RAG Service)
+```json
+{ "status": "ok", "service": "logicllm-rag-service", "timestamp": "..." }
 ```
 
 ### POST /api/analyze
 
-Analyzes code using AI and returns structured results.
-
 **Request:**
 ```json
-{
-  "code": "function hello() { console.log('Hello'); }"
-}
+{ "code": "function hello() { console.log('Hello'); }" }
 ```
 
 **Response:**
 ```json
 {
   "language": "JavaScript",
-  "bugs": ["bug description 1"],
-  "improvements": ["improvement suggestion 1"],
-  "explanation": "This function logs a greeting to the console",
+  "bugs": [],
+  "improvements": ["Use const instead of var"],
+  "explanation": "This function logs a greeting",
   "optimized_code": "const hello = () => console.log('Hello');",
   "score": 98,
   "time": "1.5s"
 }
 ```
 
-## UI Component Mapping
-
-| Component | Backend Connection | API Endpoint |
-|-----------|-------------------|--------------|
-| Header | NONE | - |
-| CodeInput | NONE | - |
-| ActionBar | FN-004 (Input Validator) | POST /api/analyze |
-| EmptyState | NONE | - |
-| SkeletonLoader | NONE | - |
-| ThinkingPanel | NONE | - |
-| ResultSection | NONE | - |
-| BugsSection | FN-006 (Response Parser) | POST /api/analyze |
-| ImprovementsSection | FN-006 (Response Parser) | POST /api/analyze |
-| ExplanationSection | FN-006 (Response Parser) | POST /api/analyze |
-| OptimizedCode | FN-006 (Response Parser) | POST /api/analyze |
-| OutputPanel | FN-006 (Response Parser) | POST /api/analyze |
-| MetadataBar | FN-006 (Response Parser) | POST /api/analyze |
-
-## Data Flow
-
-```
-User enters code
-       │
-       ▼
-┌──────────────────┐
-│  CodeInput.tsx   │  User types/pastes code
-└──────────────────┘
-       │
-       ▼
-┌──────────────────┐
-│  ActionBar.tsx   │  User clicks analyze button
-└──────────────────┘
-       │
-       ▼
-│  App.tsx         │  Sends POST /api/analyze
-       │
-       ▼
-┌─────────────────────────────────────────┐
-│           Vite Proxy (3000→3001)        │
-└─────────────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────┐
-│  FN-004: Input Validator                │
-│  - Checks code is string                │
-│  - Validates not empty                  │
-│  - Max 50,000 characters                │
-└─────────────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────┐
-│  FN-005: AI Provider Adapter            │
-│  - Constructs prompt                    │
-│  - Calls Gemini API                      │
-│  - Receives complete response            │
-│  - gemini-flash-latest model            │
-└─────────────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────┐
-│  FN-006: Response Parser                │
-│  - Parses AI JSON output               │
-│  - Calculates score                     │
-│  - Normalizes response structure        │
-└─────────────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────┐
-│  FN-007: Fallback Generator (on error)  │
-│  - Returns safe fallback response       │
-│  - Prevents frontend crashes            │
-└─────────────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────┐
-│         JSON Response to Frontend       │
-└─────────────────────────────────────────┘
-```
-
-## Logging System
-
-All backend logs use tagged format:
-
-```
-[timestamp] [LEVEL] [TAG] message
-```
-
-**Log Levels:**
-
-| Level | Tag | Description |
-|-------|-----|-------------|
-| INFO | SERVER, AI, RUNNER | General operational events |
-| DEBUG | PORT, REQUEST, VALIDATOR, PARSER | Detailed debugging info |
-| SUCCESS | SERVER, AI, PORT | Successful operations |
-| WARN | PORT, FALLBACK | Warning conditions |
-| ERROR | PORT, PARSER, SERVER | Error conditions |
-
-**Example Logs:**
-
-```
-[2026-04-24T10:30:00.000Z] [INFO] [SERVER] Backend server starting on port 3001
-[2026-04-24T10:30:01.000Z] [DEBUG] [PORT] Port 3001 is available
-[2026-04-24T10:30:05.000Z] [INFO] [AI] Calling Gemini API...
-[2026-04-24T10:30:07.000Z] [SUCCESS] [AI] Response received in 1.5s
-[2026-04-24T10:30:07.000Z] [DEBUG] [PARSER] JSON parsed successfully
-```
-
 ## Configuration
 
 ### Environment Variables
 
-Create a `.env` file in the `backend/` directory:
-
+**rag_service/.env:**
 ```env
 GEMMA_API_KEY=your_google_api_key_here
+GEMINI_MODEL=gemini-flash-latest
 ```
 
-**Required:**
+## Supported Models
 
-| Variable | Description |
-|----------|-------------|
-| GEMMA_API_KEY | API key for Google Generative Language API |
+| Model | Description |
+|-------|-------------|
+| gemini-flash-latest | Fast, cost-effective (default) |
+| gemini-2.0-flash | Gemini 2.0 Flash |
+| gemini-1.5-flash | Stable Gemini 1.5 Flash |
+| gemini-1.5-pro | Higher quality, slower |
 
-**How to get an API key:**
-1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Create a new API key with access to the Generative Language API
-3. Copy the key and add it to your `.env` file
+## Performance Notes
 
-### Port Configuration
-
-| Port | Service | Fixed |
-|------|---------|-------|
-| 3000 | Frontend (Vite) | Yes |
-| 3001 | Backend (Express) | Yes |
-
-**Note:** Ports are fixed and cannot be changed. If ports are occupied, the runner will attempt to free them. If it cannot, startup fails with a clear error.
-
-## Runner.js Commands
-
-```bash
-node runner.js start    # Start both servers
-node runner.js stop     # Stop both servers
-node runner.js restart  # Restart both servers
-```
-
-Or simply run:
-```bash
-node runner.js
-```
+- Backend to RAG timeout is set to `120000ms` (2 minutes) to avoid false timeouts on slower calls.
+- RAG service runs a startup warmup request to reduce first-user request latency.
 
 ## Response Schema
 
-The backend always returns valid JSON with this structure:
-
 ```typescript
 interface AnalysisResponse {
-  language: string;       // Auto-detected programming language
-  bugs: string[];          // Array of bug/error descriptions
-  improvements: string[]; // Array of suggestion strings
-  explanation: string;    // Plain English code explanation
-  optimized_code: string; // Optimized version of code
-  score: number;          // Quality score 0-100
-  time: string;           // Processing time (e.g., "1.5s")
+  language: string;
+  bugs: string[];
+  improvements: string[];
+  explanation: string;
+  optimized_code: string;
+  score: number;    // 0-100, computed by parser.js
+  time: string;      // Processing time
 }
 ```
 
 ## Error Handling
 
-| Error Type | HTTP Status | Handling |
-|------------|-------------|----------|
-| Invalid input | 400 | Return validation error |
-| AI API error | 500 | Trigger fallback (FN-007) |
-| Parse error | 500 | Trigger fallback (FN-007) |
-| Network error | 500 | Trigger fallback (FN-007) |
+When RAG service fails, FN-007 fallback is triggered:
+
+```json
+{
+  "language": "Unknown",
+  "bugs": [],
+  "improvements": ["Unable to analyze code. Please try again."],
+  "explanation": "An error occurred during analysis.",
+  "optimized_code": "",
+  "score": 0,
+  "time": "0ms",
+  "fallback": true
+}
+```
+
+## Rebuilding the Knowledge Base
+
+When knowledge base content changes:
+```bash
+cd rag_service
+python ingest.py
+```
 
 ## Score Calculation
 
 ```
-score = 100
-score -= (bugs.length * 5)
-score -= (improvements.length * 2)
+score = 100 - (bugs.length * 5) - (improvements.length * 2)
 score = max(0, score)
 ```
-
-- Each bug found: -5 points
-- Each improvement suggestion: -2 points
-- Minimum score: 0
-
-## Supported Models
-
-You can configure which Gemini model to use by modifying the `model` variable in `backend/src/services/aiProvider.js`:
-
-| Model | Description |
-|-------|-------------|
-| gemini-flash-latest | Fast, cost-effective for code review |
-| gemini-2.0-flash | Latest Gemini 2.0 Flash model |
-| gemini-1.5-flash | Stable Gemini 1.5 Flash model |
-| gemini-1.5-pro | Higher quality but slower |
-| gemini-2.0-pro | Most capable Gemini 2.0 model |
