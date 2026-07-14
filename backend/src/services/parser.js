@@ -12,18 +12,15 @@ function calculateScore(bugs, improvements) {
   return Math.max(0, score);
 }
 
-function parseAIResponse(rawText) {
+function parseAIResponse(dataPayload) {
   log.debug('PARSER', 'Parsing AI response');
 
   try {
-    let jsonStr = rawText.trim();
+    const parsed = typeof dataPayload === 'string' ? JSON.parse(dataPayload) : dataPayload;
 
-    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[0];
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error('Payload is not a valid object');
     }
-
-    const parsed = JSON.parse(jsonStr);
 
     const result = {
       language: parsed.language || 'Unknown',
@@ -31,6 +28,7 @@ function parseAIResponse(rawText) {
       improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
       explanation: typeof parsed.explanation === 'string' ? parsed.explanation : 'No explanation provided.',
       optimized_code: typeof parsed.optimized_code === 'string' ? parsed.optimized_code : '',
+      sources: Array.isArray(parsed.sources) ? parsed.sources : [],
       score: calculateScore(parsed.bugs, parsed.improvements),
       time: parsed.time || '0ms'
     };
@@ -41,9 +39,9 @@ function parseAIResponse(rawText) {
     return result;
   } catch (error) {
     log.error('PARSER', `Failed to parse AI response: ${error.message}`);
-    log.debug('PARSER', `Raw response was: ${rawText.substring(0, 200)}...`);
+    log.debug('PARSER', `Raw response was: ${JSON.stringify(dataPayload).substring(0, 200)}...`);
 
-    const fallback = generateFallback('JSON parsing failed. The AI response was not in the expected format.');
+    const fallback = generateFallback('Data parsing failed. The AI response was not in the expected format.');
     return fallback;
   }
 }

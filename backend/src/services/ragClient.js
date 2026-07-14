@@ -3,22 +3,24 @@ import axios from 'axios';
 const RAG_SERVICE_URL = 'http://localhost:8000';
 const TIMEOUT_MS = 120000;
 
-async function analyzeCode(code) {
+async function analyzeCode(code, language_hint, requestId) {
   const startTime = Date.now();
 
   try {
     const response = await axios.post(
       RAG_SERVICE_URL + '/analyze',
-      { code },
-      { timeout: TIMEOUT_MS }
+      { code, language_hint },
+      { 
+        timeout: TIMEOUT_MS,
+        headers: { 'x-request-id': requestId }
+      }
     );
 
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
-    const resultPayload = response?.data?.data ?? response?.data;
-    const payload = typeof resultPayload === 'string'
-      ? resultPayload
-      : JSON.stringify(resultPayload);
+    
+    // Do not double serialize; parser.js expects an object now
+    const payload = response?.data?.data ?? response?.data;
 
     return {
       success: true,

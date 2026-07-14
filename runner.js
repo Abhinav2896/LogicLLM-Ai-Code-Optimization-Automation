@@ -326,6 +326,14 @@ async function main() {
   startFrontend();
 
   log.success('RUNNER', 'All services running...');
+  log.info('RUNNER', 'Opening Microsoft Edge...');
+  
+  exec('start msedge "http://localhost:' + FRONTEND_PORT + '"', (err) => {
+    if (err) {
+      log.warn('RUNNER', 'Failed to open Edge automatically. Please open the URL manually.');
+    }
+  });
+
   log.info('RUNNER', 'Press Ctrl+C to stop all servers');
 
   console.log('\n========================================');

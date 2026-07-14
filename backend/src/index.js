@@ -12,16 +12,22 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, '../.env') });
 
 const PORT = process.env.BACKEND_PORT || 3001;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-
 const app = express();
 
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (server-to-server, curl, etc.)
+    if (!origin) return callback(null, true);
+    // Allow any localhost origin during development
+    if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 
-app.use(express.json({ limit: '100kb' }));
+app.use(express.json({ limit: '1mb' }));
 
 app.use((req, res, next) => {
   log.debug('REQUEST', `${req.method} ${req.path}`);

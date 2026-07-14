@@ -29,7 +29,7 @@ router.post('/analyze', async (req, res) => {
   log.debug('VALIDATOR', `Validation passed for request ${requestId}`);
   log.info('AI', `Starting AI analysis for request ${requestId}`);
 
-  const aiResult = await analyzeCode(validation.code);
+  const aiResult = await analyzeCode(validation.code, validation.language_hint, requestId);
 
   if (!aiResult.success) {
     log.error('AI', `AI call failed for request ${requestId}: ${aiResult.error}`);
@@ -45,6 +45,7 @@ router.post('/analyze', async (req, res) => {
   const parsedResult = parseAIResponse(aiResult.data);
 
   parsedResult.requestId = requestId;
+  parsedResult.time = aiResult.time; // Use measured duration, not LLM's made-up time
   parsedResult.responseTime = `${((Date.now() - startTime) / 1000).toFixed(2)}s`;
 
   if (parsedResult.fallback) {

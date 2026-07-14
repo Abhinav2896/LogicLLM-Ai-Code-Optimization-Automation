@@ -51,7 +51,8 @@ function validateInput(body) {
 
   return {
     valid: true,
-    code: trimmedCode
+    code: trimmedCode,
+    language_hint: body.language_hint || null
   };
 }
 
