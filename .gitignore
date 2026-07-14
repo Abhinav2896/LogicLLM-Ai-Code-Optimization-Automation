@@ -17,6 +17,8 @@ venv/
 *.pt
 *.ckpt
 models/
-data/
+/data/
+!rag_service/data/knowledge_base/
+!rag_service/data/knowledge_base/*.md
 rag_service/faiss_index/
 rag_service/package-lock.json
