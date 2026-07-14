@@ -1,0 +1,29 @@
+services:
+  # Python RAG microservice
+  - type: web
+    name: logicllm-rag-service
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    rootDirectory: rag_service
+    envVars:
+      - key: GEMMA_API_KEY
+        sync: false # Render will prompt you to enter your Gemini API Key in the UI
+      - key: GEMINI_MODEL
+        value: gemini-3.1-flash-lite
+      - key: EMBEDDING_MODEL
+        value: all-MiniLM-L6-v2
+
+  # Node.js backend
+  - type: web
+    name: logicllm-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    rootDirectory: backend
+    envVars:
+      - key: RAG_SERVICE_URL
+        fromService:
+          name: logicllm-rag-service
+          type: web
+          property: host

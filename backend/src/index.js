@@ -11,15 +11,15 @@ const __dirname = dirname(__filename);
 
 dotenv.config({ path: join(__dirname, '../.env') });
 
-const PORT = process.env.BACKEND_PORT || 3001;
+const PORT = process.env.PORT || process.env.BACKEND_PORT || 3001;
 const app = express();
 
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (server-to-server, curl, etc.)
     if (!origin) return callback(null, true);
-    // Allow any localhost origin during development
-    if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+    // Allow any localhost origin during development or Vercel production deployments
+    if (/^https?:\/\/localhost(:\d+)?$/.test(origin) || origin.endsWith('.vercel.app') || origin.includes('vercel.app')) {
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));

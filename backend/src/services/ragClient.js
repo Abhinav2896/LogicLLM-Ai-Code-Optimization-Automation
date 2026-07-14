@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const RAG_SERVICE_URL = 'http://localhost:8000';
+let RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || 'http://localhost:8000';
+if (RAG_SERVICE_URL && !RAG_SERVICE_URL.startsWith('http')) {
+  RAG_SERVICE_URL = `http://${RAG_SERVICE_URL}`;
+}
 const TIMEOUT_MS = 120000;
 
 async function analyzeCode(code, language_hint, requestId) {
