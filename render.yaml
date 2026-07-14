@@ -3,6 +3,7 @@ services:
   - type: web
     name: logicllm-rag-service
     env: python
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     rootDir: rag_service
@@ -18,6 +19,7 @@ services:
   - type: web
     name: logicllm-backend
     env: node
+    plan: free
     buildCommand: npm install
     startCommand: npm start
     rootDir: backend
