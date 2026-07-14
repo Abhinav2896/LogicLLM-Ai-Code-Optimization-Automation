@@ -18,7 +18,7 @@
 - **Runtime:** Node.js (backend), Python 3.10+ (RAG service)
 - **Framework:** Express.js (backend), FastAPI (RAG service)
 - **AI Provider:** Google Generative Language API via LangChain
-- **Model:** `gemini-flash-latest` (default, configurable via env)
+- **Model:** `gemini-3.1-flash-lite` (default, configurable via env)
 - **Vector Store:** FAISS with HuggingFace Embeddings (`all-MiniLM-L6-v2`)
 - **Logging:** Custom logger with tagged log levels
 
@@ -69,7 +69,7 @@
                                   │
                                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                  FAISS VECTOR STORE (local disk)                  │
+│                  FAISS VECTOR STORE (in-memory)                   │
 │                  LangChain FAISS + HuggingFace Embeddings          │
 │                                                                    │
 │  Knowledge base:                                                  │
@@ -85,7 +85,7 @@
                                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                  GOOGLE GEMINI API                                │
-│                  gemini-2.0-flash                                │
+│                  gemini-3.1-flash-lite                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -154,9 +154,10 @@ Added `axios` dependency for HTTP calls to RAG service.
 ### 6.1 — `rag_service/vector_store.py`
 
 FAISS index management:
-- `build_index()`: Chunk knowledge files, embed, save to FAISS
-- `load_index()`: Load pre-built index (auto-build if missing)
+- `build_index()`: Chunk knowledge files, embed, and build an **in-memory** FAISS index
+- `load_index()`: Return the in-memory index singleton (built on startup)
 - `search(query, k)`: Return top-k relevant chunks
+- No local file persistence is used to avoid `pickle` deserialization risks.
 
 ### 6.2 — `rag_service/rag_pipeline.py`
 
@@ -268,7 +269,7 @@ User enters code
 | GEMMA_API_KEY | rag_service | Google Generative Language API key |
 | RAG_PORT | runner.js | RAG service port (default 8000) |
 | EMBEDDING_MODEL | rag_service | HuggingFace model (default all-MiniLM-L6-v2) |
-| GEMINI_MODEL | rag_service | Gemini model (default gemini-flash-latest) |
+| GEMINI_MODEL | rag_service | Gemini model (default gemini-3.1-flash-lite) |
 
 ---
 

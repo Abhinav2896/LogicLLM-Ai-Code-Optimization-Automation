@@ -35,7 +35,7 @@ LogicLLM is a full-stack code review application with a React frontend, Node.js 
 | RAG Service | Python + FastAPI + LangChain | 8000 |
 | Vector Store | FAISS + HuggingFace Embeddings | - |
 | AI Provider | Google Generative Language API | - |
-| Model | gemini-flash-latest (configurable) | - |
+| Model | gemini-3.1-flash-lite (configurable) | - |
 
 ## Project Structure
 
@@ -133,7 +133,7 @@ pip install -r requirements.txt
 ```bash
 # In rag_service/.env
 GEMMA_API_KEY=your_google_api_key_here
-GEMINI_MODEL=gemini-flash-latest
+GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
 **Step 4: Build FAISS index (one-time)**
@@ -186,17 +186,17 @@ node runner.js
 **rag_service/.env:**
 ```env
 GEMMA_API_KEY=your_google_api_key_here
-GEMINI_MODEL=gemini-flash-latest
+GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
 ## Supported Models
 
 | Model | Description |
 |-------|-------------|
-| gemini-flash-latest | Fast, cost-effective (default) |
-| gemini-2.0-flash | Gemini 2.0 Flash |
-| gemini-1.5-flash | Stable Gemini 1.5 Flash |
-| gemini-1.5-pro | Higher quality, slower |
+| gemini-3.1-flash-lite | Default model (fastest, lightweight) |
+| gemini-3.5-flash | Highest capacity Flash model |
+| gemini-2.5-flash | Legacy Flash 2.5 |
+| gemini-2.0-flash-lite | Legacy Flash 2.0 Lite |
 
 ## Performance Notes
 
