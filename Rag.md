@@ -29,21 +29,22 @@ This ensures that the AI review is grounded in your project's specific coding gu
 flowchart TD
     A[Node.js Backend] -- "POST /analyze { code, language_hint, x-request-id }" --> B(FastAPI Server)
     
-    subgraph RAG Service
+    subgraph RAG_Service [RAG Service]
         B --> C[LangChain Retriever]
         
-        subgraph Vector Store (In-Memory)
-            C <-->|"Query embedding"| D[(FAISS Index)]
-            D -.->|"Retrieves top-K chunks"| C
+        subgraph Vector_Store [Vector Store In-Memory]
+            C -- "Query embedding" --> D[(FAISS Index)]
+            D -. "Retrieves top-K chunks" .-> C
         end
         
         C --> E[Prompt Builder]
-        E -->|"Inject Context + User Code"| F[LangChain Gemini Wrapper]
+        E -- "Inject Context + User Code" --> F[LangChain Gemini Wrapper]
     end
     
-    F <-->|"Network Call"| G((Google Gemini API))
+    F -- "Network Call" --> G((Google Gemini API))
+    G -- "Response" --> F
     F --> H[Response Parser]
-    H -->|"Valid JSON"| A
+    H -- "Valid JSON" --> A
 ```
 
 ---
