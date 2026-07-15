@@ -1,10 +1,10 @@
 import logging
 from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from pathlib import Path
-from config import EMBEDDING_MODEL
+from config import EMBEDDING_MODEL, GEMMA_API_KEY
 
 logger = logging.getLogger("rag_service.vector_store")
 
@@ -13,8 +13,8 @@ DATA_PATH = BASE_DIR / "data" / "knowledge_base"
 
 
 def _get_embeddings():
-    """Return the shared HuggingFace embeddings model."""
-    return HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    """Return the shared Google embeddings model."""
+    return GoogleGenerativeAIEmbeddings(model=EMBEDDING_MODEL, google_api_key=GEMMA_API_KEY)
 
 
 def build_index():
