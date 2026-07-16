@@ -16,7 +16,22 @@ function parseAIResponse(dataPayload) {
   log.debug('PARSER', 'Parsing AI response');
 
   try {
-    const parsed = typeof dataPayload === 'string' ? JSON.parse(dataPayload) : dataPayload;
+    let parsed;
+    if (typeof dataPayload === 'string') {
+      let text = dataPayload.trim();
+      text = text.replace(/^```(?:json)?\s*/im, '');
+      text = text.replace(/```\s*$/im, '');
+      text = text.trim();
+      
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) {
+        text = match[0];
+      }
+      
+      parsed = JSON.parse(text);
+    } else {
+      parsed = dataPayload;
+    }
 
     if (!parsed || typeof parsed !== 'object') {
       throw new Error('Payload is not a valid object');
